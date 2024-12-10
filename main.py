@@ -16,7 +16,7 @@ class TaskNode:
 class TaskListDAG:
     def __init__(self):
         self.graph = defaultdict(list)  # Adjacency list for dependencies
-        self.tasks = {}  # Task details
+        self.tasks = {}
 
     # Add a task to the DAG
     def add_task(self, task_node):
@@ -78,7 +78,7 @@ def find_min_duration(tasks):
 
     for level in levels:
         for task_id in level:
-            task_node = tasks.tasks[task_id]  # Retrieve TaskNode by task_id
+            task_node = tasks.tasks[task_id] 
 
             if task_node.dependencies:
                 # Calculate the start time as the maximum end time of dependencies
@@ -97,7 +97,6 @@ def find_min_duration(tasks):
 def assign_workers(task_list):
     levels = task_list.topological_sort_by_levels()
     workers = []
-    worker_index = 0
 
     minimum_project_duration = find_min_duration(task_list)
 
@@ -105,7 +104,7 @@ def assign_workers(task_list):
     for level, task_ids in enumerate(levels):
         if level == 0:
             for task_id in task_ids:
-                worker = [task_list.tasks[task_id]]  # Retrieve TaskNode
+                worker = [task_list.tasks[task_id]]
                 workers.append(worker)
         else:
             for task_id in task_ids:
@@ -120,13 +119,45 @@ def assign_workers(task_list):
                     workers.append([task])
 
     # Consolidate redundant workers
+    workers = merge_workers(workers, minimum_project_duration)
 
-    # Print worker assignments
+    # Temporary print worker assignments
     for i, worker in enumerate(workers, 1):
-        durations = [task.duration for task in worker]
-        task_ids = [task.task_id for task in worker]
+        durations = [task.duration for task in worker] 
+        task_ids = [task.task_id for task in worker]  
         print(f"Worker {i}: {durations}, {task_ids}")
+    
+    return workers
 
+
+def merge_workers(workers, max_duration):
+    final_workers = []  # List to hold the resulting merged workers
+    current_merged_worker = []  # Temporary list to accumulate tasks
+    current_duration = 0  # Tracks the accumulated duration of the current merged worker
+
+    for worker in workers:
+        # Skip this worker if any task has dependencies
+        if any(task.dependencies for task in worker):
+            final_workers.append(worker)
+            continue
+
+        for task in worker:
+            # Check if adding the current task exceeds max_duration
+            if current_duration + task.duration <= max_duration:
+                current_merged_worker.append(task)
+                current_duration += task.duration
+            else:
+                # Add the current merged worker to final_workers and reset for a new one
+                if current_merged_worker:
+                    final_workers.append(current_merged_worker)
+                current_merged_worker = [task]  # Start a new merged worker with the current task
+                current_duration = task.duration
+
+    # Append any remaining tasks in the last accumulated worker
+    if current_merged_worker:
+        final_workers.append(current_merged_worker)
+
+    return final_workers
 
 
 def main():
