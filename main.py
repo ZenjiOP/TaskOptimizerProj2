@@ -1,97 +1,61 @@
-from collections import deque, defaultdict
+from collections import defaultdict, deque
 
 
 class TaskNode:
-    # Class representing each individual task
-    def __init__(self, task_id, dependencies, duration):
+    def __init__(self, task_id, duration, dependencies=None):
         self.task_id = task_id
-        self.dependencies = dependencies
         self.duration = duration
-
-        # calculated by the graph
-        self.start_time = None
-        self.end_time = None
+        self.dependencies = dependencies if dependencies else []
+        self.start_time = 0
+        self.end_time = 0
 
 
 class TaskListDAG:
     def __init__(self):
         self.graph = defaultdict(list)  # Adjacency list for dependencies
-        self.tasks = {}
+        self.tasks = {}  # Task details
 
-    # Add a task to the DAG
     def add_task(self, task_node):
-        task_id = task_node.task_id
-        if task_id in self.tasks:
-            raise ValueError(f"Task '{task_id}' already exists in the DAG")
-
-        self.tasks[task_id] = task_node
-
-        # Add edges to represent dependencies
+        self.tasks[task_node.task_id] = task_node
         for dependency in task_node.dependencies:
-            if dependency not in self.tasks:
-                raise ValueError(f"Dependency {dependency} for task {task_id} not found")
-            self.graph[dependency].append(task_id)
+            self.graph[dependency].append(task_node.task_id)  # Added dependency handling logic (TH)
 
-        if task_id not in self.graph:
-            self.graph[task_id] = []
-
-    def print_graph(self):
-        for node in self.graph:
-            print(f"{node} -> {self.graph[node]}")
-
-    # Topological sort by levels
     def topological_sort_by_levels(self):
-        # Calculate in-degrees for all tasks
-        in_degree = {task: 0 for task in self.tasks}
-        for task in self.graph:
-            for neighbor in self.graph[task]:
-                in_degree[neighbor] += 1
+        in_degree = {task_id: 0 for task_id in self.tasks}  # Calculate in-degree for all tasks (TH)
+        for task_id in self.graph:
+            for neighbor in self.graph[task_id]:
+                in_degree[neighbor] += 1  # Update in-degree for neighbors (TH)
 
-        # Initialize queue with nodes having in-degree 0
-        queue = deque(sorted([task for task in self.tasks if in_degree[task] == 0]))
+        zero_in_degree = deque([task_id for task_id in self.tasks if in_degree[task_id] == 0])  # Initialize zero in-degree queue (TH)
         levels = []
-
-        # Process nodes level by level
-        while queue:
+        while zero_in_degree:
             level = []
-            for _ in range(len(queue)):  # Process all nodes at the current level
-                current_task = queue.popleft()
-                level.append(current_task)
-
-                for neighbor in sorted(self.graph[current_task]):
+            for _ in range(len(zero_in_degree)):
+                task_id = zero_in_degree.popleft()
+                level.append(task_id)
+                for neighbor in self.graph[task_id]:
                     in_degree[neighbor] -= 1
                     if in_degree[neighbor] == 0:
-                        queue.append(neighbor)
-
-            levels.append(level)  # Add the current level to the result
-
-        # Check for cycles
-        if sum(len(level) for level in levels) != len(self.tasks):
-            raise ValueError("Cycle detected in the DAG")
-
+                        zero_in_degree.append(neighbor)
+            levels.append(level)  # Append the level to result (TH)
         return levels
 
 
-# Find the minimum time to finish the project based on the length of the longest task and update start/end times
 def find_min_duration(tasks):
-    levels = tasks.topological_sort_by_levels()
+    levels = tasks.topological_sort_by_levels()  # Retrieve task levels (TH)
+    min_duration = 0
 
     for level in levels:
         for task_id in level:
-            task_node = tasks.tasks[task_id] 
-
+            task_node = tasks.tasks[task_id]  # Access TaskNode (TH)
             if task_node.dependencies:
-                # Calculate the start time as the maximum end time of dependencies
-                task_node.start_time = max(tasks.tasks[dep].end_time for dep in task_node.dependencies)
+                task_node.start_time = max(tasks.tasks[dep].end_time for dep in task_node.dependencies)  # Calculate start time (TH)
             else:
-                # No dependencies, start immediately
                 task_node.start_time = 0
+            task_node.end_time = task_node.start_time + task_node.duration  # Set end time (TH)
+        min_duration = max(min_duration, max(task.end_time for task in map(tasks.tasks.get, level)))  # Update min duration (TH)
 
-            # Calculate end time
-            task_node.end_time = task_node.start_time + task_node.duration
-
-    # Return the maximum end_time across all tasks
-    return max(task.end_time for task in tasks.tasks.values())
+    return min_duration
 
 
 def assign_workers(task_list):
@@ -123,10 +87,10 @@ def assign_workers(task_list):
 
     # Temporary print worker assignments
     for i, worker in enumerate(workers, 1):
-        durations = [task.duration for task in worker] 
-        task_ids = [task.task_id for task in worker]  
-        print(f"Worker {i}: {durations}, {task_ids}")
-    
+        durations = [task.duration for task in worker]
+        task_ids = [task.task_id for task in worker]
+        print(f"Worker {i}: d:{durations}, t:{task_ids}")
+
     return workers
 
 
@@ -162,21 +126,22 @@ def merge_workers(workers, max_duration):
 
 def main():
     task_list = TaskListDAG()
+    
+    task_list.add_task(TaskNode(1, 10))
+    task_list.add_task(TaskNode(2, 2))
+    task_list.add_task(TaskNode(3, 2, [2]))
+    task_list.add_task(TaskNode(4, 2, [2, 3]))
+    task_list.add_task(TaskNode(5, 3))
+    task_list.add_task(TaskNode(6, 2, [5]))
+    task_list.add_task(TaskNode(7, 5))
+    task_list.add_task(TaskNode(8, 2, [2, 3]))
 
-    task_list.add_task(TaskNode("A", dependencies=[], duration=10))
-    task_list.add_task(TaskNode("B", dependencies=[], duration=2))
-    task_list.add_task(TaskNode("C", dependencies=["B"], duration=2))
-    task_list.add_task(TaskNode("D", dependencies=["B", "C"], duration=2))
-    task_list.add_task(TaskNode("E", dependencies=[], duration=3))
-    task_list.add_task(TaskNode("F", dependencies=["E"], duration=2))
-    task_list.add_task(TaskNode("G", dependencies=[], duration=5))
-    task_list.add_task(TaskNode("H", dependencies=["B", "C"], duration=2))
-
-    task_list.print_graph()
-
-    print(f"Minimum total task completion time: {find_min_duration(task_list)}")
-    print(task_list.topological_sort_by_levels())
-    assign_workers(task_list)
+    print("Minimum project duration:", find_min_duration(task_list))  # Calculate and print project duration
+    workers = assign_workers(task_list)
+    print("Final worker assignments:")
+    for i, worker in enumerate(workers, 1):
+        task_ids = [task.task_id for task in worker]
+        print(f"Worker {i}: {task_ids}")  # Display final worker assignments
 
 
 if __name__ == "__main__":
