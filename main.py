@@ -1,4 +1,6 @@
 from collections import defaultdict, deque
+import os
+import csv
 
 
 class TaskNode:
@@ -18,15 +20,16 @@ class TaskListDAG:
     def add_task(self, task_node):
         self.tasks[task_node.task_id] = task_node
         for dependency in task_node.dependencies:
-            self.graph[dependency].append(task_node.task_id)  # Added dependency handling logic (TH)
+            self.graph[dependency].append(task_node.task_id)  # Added dependency handling logic
 
     def topological_sort_by_levels(self):
-        in_degree = {task_id: 0 for task_id in self.tasks}  # Calculate in-degree for all tasks (TH)
+        in_degree = {task_id: 0 for task_id in self.tasks}  # Calculate in-degree for all tasks
         for task_id in self.graph:
             for neighbor in self.graph[task_id]:
-                in_degree[neighbor] += 1  # Update in-degree for neighbors (TH)
+                in_degree[neighbor] += 1  # Update in-degree for neighbors
 
-        zero_in_degree = deque([task_id for task_id in self.tasks if in_degree[task_id] == 0])  # Initialize zero in-degree queue (TH)
+        zero_in_degree = deque(
+            [task_id for task_id in self.tasks if in_degree[task_id] == 0])  # Initialize zero in-degree queue
         levels = []
         while zero_in_degree:
             level = []
@@ -37,23 +40,33 @@ class TaskListDAG:
                     in_degree[neighbor] -= 1
                     if in_degree[neighbor] == 0:
                         zero_in_degree.append(neighbor)
-            levels.append(level)  # Append the level to result (TH)
+            levels.append(level)  # Append the level to result
         return levels
 
 
 def find_min_duration(tasks):
-    levels = tasks.topological_sort_by_levels()  # Retrieve task levels (TH)
+    levels = tasks.topological_sort_by_levels()  # Retrieve task levels
     min_duration = 0
+    latest_task_node = None  # Reference to the task with the latest end_time
 
     for level in levels:
         for task_id in level:
-            task_node = tasks.tasks[task_id]  # Access TaskNode (TH)
+            task_node = tasks.tasks[task_id]  # Access TaskNode
             if task_node.dependencies:
-                task_node.start_time = max(tasks.tasks[dep].end_time for dep in task_node.dependencies)  # Calculate start time (TH)
+                task_node.start_time = max(
+                    tasks.tasks[dep].end_time for dep in task_node.dependencies)  # Calculate start time
             else:
                 task_node.start_time = 0
-            task_node.end_time = task_node.start_time + task_node.duration  # Set end time (TH)
-        min_duration = max(min_duration, max(task.end_time for task in map(tasks.tasks.get, level)))  # Update min duration (TH)
+            task_node.end_time = task_node.start_time + task_node.duration  # Set end time
+
+            # Check if this task has the latest end_time
+            if task_node.end_time > min_duration:
+                min_duration = task_node.end_time
+                latest_task_node = task_node  # Update the reference to the latest task node
+
+    # Print the task with the latest end_time
+    if latest_task_node:
+        print(f"Task with latest end_time: {latest_task_node.task_id}, End Time: {latest_task_node.end_time}")
 
     return min_duration
 
@@ -70,6 +83,7 @@ def assign_workers(task_list):
             for task_id in task_ids:
                 worker = [task_list.tasks[task_id]]
                 workers.append(worker)
+            print(len(workers))
         else:
             for task_id in task_ids:
                 task = task_list.tasks[task_id]
@@ -84,12 +98,6 @@ def assign_workers(task_list):
 
     # Consolidate redundant workers
     workers = merge_workers(workers, minimum_project_duration)
-
-    # Temporary print worker assignments
-    for i, worker in enumerate(workers, 1):
-        durations = [task.duration for task in worker]
-        task_ids = [task.task_id for task in worker]
-        print(f"Worker {i}: d:{durations}, t:{task_ids}")
 
     return workers
 
@@ -124,9 +132,37 @@ def merge_workers(workers, max_duration):
     return final_workers
 
 
+def load_data(task_list, file_name):
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+
+    data_csv = os.path.join(current_dir, file_name)
+
+    with open(data_csv, mode='r') as file:
+        reader = csv.reader(file)
+        next(reader)  # skip header
+
+        for row in reader:
+            task_id = row[0].strip()
+            # Replace "DT" with "Task" and split by commas
+            dependencies = [
+                dep.strip().replace("DT", "Task") for dep in row[1].split(',')
+            ] if row[1] else []
+            duration = int(row[2].strip())
+
+            # Debug
+            # print(task_id, ": ", dependencies, ": ", duration)
+
+            task_list.add_task(TaskNode(task_id, duration, dependencies))
+
+    return task_list
+
+
 def main():
     task_list = TaskListDAG()
-    
+
+    task_list = load_data(task_list, 'Task_Dependencies_and_Time_Dataframe_Revised.csv')
+
+    '''
     task_list.add_task(TaskNode(1, 10))
     task_list.add_task(TaskNode(2, 2))
     task_list.add_task(TaskNode(3, 2, [2]))
@@ -135,6 +171,7 @@ def main():
     task_list.add_task(TaskNode(6, 2, [5]))
     task_list.add_task(TaskNode(7, 5))
     task_list.add_task(TaskNode(8, 2, [2, 3]))
+    '''
 
     print("Minimum project duration:", find_min_duration(task_list))  # Calculate and print project duration
     workers = assign_workers(task_list)
