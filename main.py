@@ -2,7 +2,6 @@ import os
 import csv
 import copy
 
-## Fallback for just in case I don't get something more creative working before class --- rename file to main.py before running ---
 
 class TaskNode:
     def __init__(self, task_id, duration, main_task=None):
@@ -60,7 +59,7 @@ def assign_workers(task_list):
         changes_made = True
         while changes_made:
             changes_made = False
-            for task in remaining_tasks[:]:  # Iterate safely with task removal
+            for task in remaining_tasks[:]:  
                 if task.main_task is None:
                     continue  # Skip tasks without a main_task
 
@@ -111,8 +110,6 @@ def merge_workers(workers, task_list):
                 merged_tasks.add(task_to_merge)  # Mark as merged
                 break  # Stop after successfully merging this task
 
-    # Another pass now looking to merge invalid workers in a way in which DT's are still respected?
-
     return invalid_workers
 
 
@@ -128,14 +125,14 @@ def main():
     for i, worker in enumerate(workers, 1):
         completion_times = [task.min_start_time + task.duration for task in worker]
 
-        rolling_total = 0  # Initialize rolling total
+        rolling_total = 0
         task_info = []  # To store formatted task strings
 
         for task, completion_time in zip(worker, completion_times):
             task_info.append(f"{task.task_id}({completion_time})T:({rolling_total})")
-            rolling_total += task.duration  # Add current task's duration to rolling total
+            rolling_total += task.duration 
 
-        task_info_str = ', '.join(task_info)  # Join all formatted tasks into a string
+        task_info_str = ', '.join(task_info) 
 
         total_work = sum(task.duration for task in worker)
         print(f"Worker {i}: {task_info_str}: Total Work: {total_work}")
